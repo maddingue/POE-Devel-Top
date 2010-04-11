@@ -1,4 +1,5 @@
 MANIFEST
+MANIFEST.SKIP
 META.yml
 Build.PL
 Makefile.PL
@@ -8,4 +9,3 @@ lib/POE/Devel/Top.pm
 t/00-load.t
 t/pod-coverage.t
 t/pod.t
-META.yml
