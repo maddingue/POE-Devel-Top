@@ -70,7 +70,7 @@ sub render {
     my $egid  = (split / /, $))[0];
     my @grent = getgrgid(int $egid);
 
-    print "\e[2J";
+    print "\e[2J\e[f";
     print "Process ID: $$,  UID: $> ($pwent[0]),  GID: $egid ($grent[0])\n",
           "Resource usage:  user: $times[0] sec (+$times[2] sec),  ",
                         "system: $times[1] sec (+$times[3] sec)\n",
