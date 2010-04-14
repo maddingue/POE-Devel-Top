@@ -37,11 +37,107 @@ sub spawn {
         inline_states => {
             _start => sub {
                 $_[KERNEL]->alias_set("[$class]");
-                $_[KERNEL]->delay(poe_devel_top => 2);
+                $_[KERNEL]->delay(poe_devel_top_collect => 2);
             },
-            poe_devel_top => \&render,
+            poe_devel_top_collect   => \&collect,
+            poe_devel_top_render    => \&render,
         },
     );
+}
+
+
+#
+# collect()
+# -------
+sub collect {
+    my $kernel = $_[KERNEL];
+    my $poe_api = POE::API::Peek->new;
+    my $now = time;
+
+    # collect general data about the current process
+    my @times = times;
+    my @pwent = getpwuid(int $>);
+    my $egid  = (split / /, $))[0];
+    my @grent = getgrgid(int $egid);
+
+    my %general = (
+        process => {
+            pid     => $$,
+            uid     => $>,
+            gid     => $egid,
+            user    => $pwent[0],
+            group   => $grent[0],
+        },
+        resource => {
+            utime_self  => $times[0],
+            utime_chld  => $times[2],
+            stime_self  => $times[1],
+            stime_chld  => $times[3],
+        },
+        poe => {
+            sessions    => $poe_api->session_count,
+            handles     => $poe_api->handle_count,
+            loop        => $poe_api->which_loop,
+        },
+    );
+
+    # collect information about the sessions
+    my $kernel_id   = $kernel->ID;
+    my $kernel_name = "[POE::Kernel]";
+
+    if ($kernel_id !~ /^\d/) {
+        $kernel_name .= " id=$kernel_id";
+        $kernel_id   = 0;
+    }
+
+    my @sessions = (
+        {   # store the POE kernel as the first session
+            id          => $kernel_id,
+            aliases     => $kernel_name,
+            memory_size => $poe_api->kernel_memory_size,
+            refcount    => $poe_api->get_session_refcount($kernel),
+            events_to   => $poe_api->event_count_to($kernel),
+            events_from => $poe_api->event_count_from($kernel),
+        },
+    );
+
+    for my $session (sort { $a->ID <=> $b->ID } $poe_api->session_list) {
+        push @sessions, {
+          id            => $session->ID,
+          aliases       => join(",", $poe_api->session_alias_list($session)),
+          memory_size   => $poe_api->session_memory_size($session),
+          refcount      => $poe_api->get_session_refcount($session),
+          events_to     => $poe_api->event_count_to($session),
+          events_from   => $poe_api->event_count_from($session),
+        };
+    }
+
+    # collect information about the events
+    my @events;
+
+    for my $event ($poe_api->event_queue_dump) {
+        push @events, {
+            id          => $event->{ID},
+            name        => $event->{event},
+            type        => $event->{type},
+            priority    => $event->{priority} > $now ?
+                $event->{priority} - $now : $event->{priority},
+            source      => $event->{source}->ID,
+            destination => $event->{destination}->ID,
+        }
+    }
+
+    # create the final hash
+    my %stats = (
+        general     => \%general,
+        sessions    => \@sessions,
+        events      => \@events,
+    );
+
+    # call the renderer
+    $kernel->yield(poe_devel_top_render => \%stats);
+
+    return \%stats
 }
 
 
@@ -49,11 +145,11 @@ sub spawn {
 # render()
 # ------
 sub render {
-    my $kernel = $_[KERNEL];
-    my $poe_api = POE::API::Peek->new;
-    my $now = time;
+    my ($kernel, $stats) = @_[ KERNEL, ARG0 ];
+    my $proc    = $stats->{general}{process};
+    my $rsrc    = $stats->{general}{resource};
 
-    $kernel->delay(poe_devel_top => 2);
+    $kernel->delay(poe_devel_top_collect => 2);
 
     local $Term::ANSIColor::AUTORESET = 1;
 
@@ -65,54 +161,32 @@ sub render {
     my $event_row       = "%5d  %-17s %4d %5d %5d  %-40s\n";
     my @event_cols      = qw< ID Type Pri Src Dest Name >;
 
-    my @times = times;
-    my @pwent = getpwuid(int $>);
-    my $egid  = (split / /, $))[0];
-    my @grent = getgrgid(int $egid);
-
-    print "\e[2J\e[f";
-    print "Process ID: $$,  UID: $> ($pwent[0]),  GID: $egid ($grent[0])\n",
-          "Resource usage:  user: $times[0] sec (+$times[2] sec),  ",
-                        "system: $times[1] sec (+$times[3] sec)\n",
-          "Sessions: ", $poe_api->session_count, " total,  ",
-          "Handles: ", $poe_api->handle_count, " total,  ",
-          "Loop: ", $poe_api->which_loop, "\n\n";
-
-    my $kernel_id   = $kernel->ID;
-    my $kernel_name = "[POE::Kernel]";
-
-    if ($kernel_id !~ /^\d/) {
-        $kernel_name .= " id=$kernel_id";
-        $kernel_id   = 0;
-    }
+    print "\e[2J\e[f",
+          "Process ID: $proc->{pid},  ",
+          "UID: $proc->{uid} ($proc->{user}),  ",
+          "GID: $proc->{gid} ($proc->{group})\n",
+          "Resource usage:  ",
+            "user: $rsrc->{utime_self} sec (+$rsrc->{utime_chld} sec),  ",
+            "system: $rsrc->{stime_self} sec (+$rsrc->{stime_chld} sec)\n",
+          "Sessions: $stats->{general}{poe}{sessions} total,  ",
+          "Handles: $stats->{general}{poe}{handles} total,  ",
+          "Loop: $stats->{general}{poe}{loop}\n\n";
 
     print BOLD " Sessions", $/;
     printf $session_head, @session_cols;
     printf $session_row,
-        $kernel_id,
-        human_size( $poe_api->kernel_memory_size ),
-        $poe_api->get_session_refcount($kernel), 
-        $poe_api->event_count_to($kernel), 
-        $poe_api->event_count_from($kernel),
-        $kernel_name;
-    printf $session_row,
-        $_->ID,
-        human_size( $poe_api->session_memory_size($_) ),
-        $poe_api->get_session_refcount($_),
-        $poe_api->event_count_to($_),
-        $poe_api->event_count_from($_),
-        join(",", $poe_api->session_alias_list($_))
-        for sort { $a->ID <=> $b->ID } $poe_api->session_list;
+        $_->{id}, human_size( $_->{memory_size} ), $_->{refcount},
+        $_->{events_to}, $_->{events_from}, $_->{aliases}
+        for @{$stats->{sessions}};
 
     print $/;
 
     print BOLD " Events", $/;
     printf $event_head, @event_cols;
-    printf $event_row, $_->{ID}, $_->{type},
-        $_->{priority} > $now ? $_->{priority}-$now : $_->{priority},
-        $_->{source}->ID,
-        $_->{destination}->ID, $_->{event}
-        for $poe_api->event_queue_dump;
+    printf $event_row,
+        $_->{id}, $_->{type}, $_->{priority},
+        $_->{source}, $_->{destination}, $_->{name}
+        for @{$stats->{events}};
 
     print $/;
 }
