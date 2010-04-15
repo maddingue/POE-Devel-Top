@@ -15,12 +15,12 @@ our $VERSION = "0.001";
 # import()
 # ------
 sub import {
-    my ($class) = @_;
+    my ($class, @args) = @_;
 
     # if caller line is zero, it means the module was loaded from the
     # command line, in which case we automatically spawn the session
     my (undef, undef, $line) = caller;
-    $class->spawn if $line == 0;
+    $class->spawn(render => "console", @args) if $line == 0;
 }
 
 
@@ -31,9 +31,9 @@ sub spawn {
     my ($class, @args) = @_;
 
     croak "Odd number of argument" if @args % 2 == 1;
-    my %param = @args;
 
     POE::Session->create(
+        heap => { @args },
         inline_states => {
             _start => sub {
                 $_[KERNEL]->alias_set("[$class]");
@@ -41,6 +41,7 @@ sub spawn {
             },
             poe_devel_top_collect   => \&collect,
             poe_devel_top_render    => \&render,
+            poe_devel_top_store     => \&store,
         },
     );
 }
@@ -50,7 +51,7 @@ sub spawn {
 # collect()
 # -------
 sub collect {
-    my $kernel = $_[KERNEL];
+    my ($kernel, $heap) = @_[ KERNEL, HEAP ];
     my $poe_api = POE::API::Peek->new;
     my $now = time;
 
@@ -134,8 +135,16 @@ sub collect {
         events      => \@events,
     );
 
-    # call the renderer
-    $kernel->yield(poe_devel_top_render => \%stats);
+    # call myself
+    $kernel->delay(poe_devel_top_collect => 2);
+
+    # call the dumper event
+    $kernel->yield(poe_devel_top_store => \%stats)
+        if $heap->{dump_as} and $heap->{dump_as} ne "none";
+
+    # call the renderer event
+    $kernel->yield(poe_devel_top_render => \%stats)
+        if $heap->{render} eq "console";
 
     return \%stats
 }
@@ -148,8 +157,6 @@ sub render {
     my ($kernel, $stats) = @_[ KERNEL, ARG0 ];
     my $proc    = $stats->{general}{process};
     my $rsrc    = $stats->{general}{resource};
-
-    $kernel->delay(poe_devel_top_collect => 2);
 
     local $Term::ANSIColor::AUTORESET = 1;
 
@@ -211,6 +218,36 @@ sub human_size {
 }
 
 
+#
+# store()
+# -----
+sub store {
+    my ($kernel, $heap, $stats) = @_[ KERNEL, HEAP, ARG0 ];
+
+    if ($heap->{dump_as} eq "yaml") {
+        if (eval "require YAML; 1") {
+            YAML::DumpFile($heap->{dump_to}, $stats);
+            return
+        }
+        else {
+            $heap->{dump_as} = "native";
+            $heap->{dump_to} =~ s/\.ya?ml$/.dmp/;
+            carp "warning: YAML not available. Defaulting to native format."
+        }
+    }
+
+    if ($heap->{dump_as} eq "native") {
+        if (eval "require Storable; 1") {
+            Storable::nstore($stats, $heap->{dump_to});
+            return
+        }
+        else {
+            croak "fatal: Can't load Storable: $@"
+        }
+    }
+}
+
+
 __END__
 
 =head1 NAME
@@ -248,6 +285,26 @@ In this early version, it only prints the information on C<STDOUT>.
 =head2 spawn()
 
 Create the internal session that prints the information on screen.
+
+B<Options>
+
+=over
+
+=item *
+
+C<dump_as> - Specify the dumping format: C<"native"> for Storable,
+C<"yaml"> for YAML.
+
+=item *
+
+C<dump_to> - Specify the dump file path.
+
+=item *
+
+C<render> - Set to C<"none"> to disable any rendering. Set to C<"console">
+to enable a rendering on the console, similar to the C<top(1)> command.
+
+=back
 
 
 =head1 AUTHOR
