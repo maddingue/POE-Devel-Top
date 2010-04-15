@@ -1,0 +1,39 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+
+use POE qw< Devel::Top >;
+use Storable;
+
+
+#
+# main
+# ----
+MAIN: {
+    run() unless caller();
+}
+
+
+#
+# run()
+# ---
+sub run {
+    my ($file) = @ARGV;
+
+    POE::Session->create(
+        inline_states => {
+            _start => sub {
+                $_[HEAP]->{stats_file} = "$file";
+                $_[KERNEL]->delay(poe_devel_top_collect => 2);
+            },
+            poe_devel_top_collect => sub {
+                my $stats = retrieve($_[HEAP]->{stats_file});
+                $_[KERNEL]->yield(poe_devel_top_render => $stats);
+            },
+            poe_devel_top_render => \&POE::Devel::Top::render,
+        },
+    );
+
+    POE::Kernel->run
+}
+
