@@ -34,11 +34,15 @@ sub spawn {
     croak "Odd number of argument" if @args % 2 == 1;
 
     POE::Session->create(
-        heap => { @args },
+        heap => {
+            interval => 2,
+            @args
+        },
+
         inline_states => {
             _start => sub {
                 $_[KERNEL]->alias_set("[$class]");
-                $_[KERNEL]->delay(poe_devel_top_collect => 2);
+                $_[KERNEL]->delay(poe_devel_top_collect => $_[HEAP]->{interval});
             },
             poe_devel_top_collect   => \&collect,
             poe_devel_top_render    => \&render,
@@ -128,7 +132,7 @@ sub collect {
     );
 
     # call myself
-    $kernel->delay(poe_devel_top_collect => 2);
+    $kernel->delay(poe_devel_top_collect => $heap->{interval});
 
     # call the dumper event
     $kernel->yield(poe_devel_top_store => \%stats)
@@ -292,6 +296,10 @@ C<"yaml"> for YAML.
 =item *
 
 C<dump_to> - Specify the dump file path.
+
+=item *
+
+C<interval> - Specify the delay in seconds between updates.
 
 =item *
 

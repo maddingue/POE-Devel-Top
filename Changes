@@ -3,7 +3,8 @@ Revision history for POE-Devel-Top
 xxxxx   xxxxxxxxxx
         [FEATURE] Add support for dumping the information to a file.
         [FEATURE] Add program bin/poe-devel-top to render dump files.
-        [FEATURE] Add support for the "render", "dump_as" and "dump_to" options.
+        [FEATURE] Add support for the "render", "interval", "dump_as"
+        and "dump_to" options.
         [CODE] Separated collecting and rendering stages.
 
 0.001   2010.04.11
