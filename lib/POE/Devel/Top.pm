@@ -84,35 +84,26 @@ sub collect {
     );
 
     # collect information about the sessions
-    my $kernel_id   = $kernel->ID;
-    my $kernel_name = "[POE::Kernel]";
+    my $kernel_id = $kernel->ID;
+    my @sessions;
 
-    if ($kernel_id !~ /^\d/) {
-        $kernel_name .= " id=$kernel_id";
-        $kernel_id   = 0;
-    }
-
-    my @sessions = (
-        {   # store the POE kernel as the first session
-            id          => $kernel_id,
-            aliases     => $kernel_name,
-            memory_size => $poe_api->kernel_memory_size,
-            refcount    => $poe_api->get_session_refcount($kernel),
-            events_to   => $poe_api->event_count_to($kernel),
-            events_from => $poe_api->event_count_from($kernel),
-        },
-    );
-
-    for my $session (sort { $a->ID <=> $b->ID } $poe_api->session_list) {
+    for my $session ($poe_api->session_list) {
         push @sessions, {
-          id            => $session->ID,
-          aliases       => join(",", $poe_api->session_alias_list($session)),
+          $session->ID eq $kernel_id ? (
+              id        => 0,
+              aliases   => "[POE::Kernel] id=".$session->ID,
+          ) : (
+              id        => $session->ID,
+              aliases   => join(",", $poe_api->session_alias_list($session)),
+          ),
           memory_size   => $poe_api->session_memory_size($session),
           refcount      => $poe_api->get_session_refcount($session),
           events_to     => $poe_api->event_count_to($session),
           events_from   => $poe_api->event_count_from($session),
         };
     }
+
+    @sessions = sort { $a->{id} <=> $b->{id} } @sessions;
 
     # collect information about the events
     my @events;
