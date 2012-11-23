@@ -249,6 +249,8 @@ sub store {
 }
 
 
+__PACKAGE__
+
 __END__
 
 =head1 NAME
