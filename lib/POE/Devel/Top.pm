@@ -19,8 +19,9 @@ sub import {
 
     # if caller line is zero, it means the module was loaded from the
     # command line, in which case we automatically spawn the session
-    my (undef, undef, $line) = caller;
-    $class->spawn(render => "console", @args) if $line == 0;
+    my ($package, undef, $line) = caller;
+    $class->spawn(render => "console", @args)
+        if $line == 0 or $package eq __PACKAGE__;
 }
 
 
