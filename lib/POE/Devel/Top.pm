@@ -140,7 +140,7 @@ sub collect {
 
     # call the renderer event
     $kernel->yield(poe_devel_top_render => \%stats)
-        if $heap->{render} eq "console";
+        if $heap->{render} and $heap->{render} eq "console";
 
     return \%stats
 }
