@@ -300,6 +300,7 @@ C<dump_to> - Specify the dump file path.
 =item *
 
 C<interval> - Specify the delay in seconds between updates.
+Default is 2 seconds.
 
 =item *
 
