@@ -8,7 +8,7 @@ use POE qw< API::Peek Session >;
 use Term::ANSIColor qw< :constants >;
 
 
-our $VERSION = "0.001";
+our $VERSION = "0.100";
 
 
 #
@@ -254,7 +254,7 @@ POE::Devel::Top - Display information about POE sessions and events
 
 =head1 VERSION
 
-Version 0.001
+Version 0.100
 
 =head1 SYNOPSIS
 
