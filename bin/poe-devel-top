@@ -24,13 +24,13 @@ sub run {
         inline_states => {
             _start => sub {
                 $_[HEAP]->{stats_file} = "$file";
-                $_[KERNEL]->delay(poe_devel_top_collect => 2);
+                $_[KERNEL]->delay(collect => 2);
             },
-            poe_devel_top_collect => sub {
+            collect => sub {
                 my $stats = retrieve($_[HEAP]->{stats_file});
-                $_[KERNEL]->yield(poe_devel_top_render => $stats);
+                $_[KERNEL]->yield(render => $stats);
             },
-            poe_devel_top_render => \&POE::Devel::Top::render,
+            render => \&POE::Devel::Top::render,
         },
     );
 
