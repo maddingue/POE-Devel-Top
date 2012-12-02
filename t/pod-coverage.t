@@ -14,4 +14,4 @@ my $min_pc = 0.18;
 plan skip_all => "Pod::Coverage $min_pc required for testing POD coverage"
     unless eval "use Pod::Coverage $min_pc; 1";
 
-all_pod_coverage_ok({ also_private => [qw< ^render$ ^human_size$ >] });
+all_pod_coverage_ok({ also_private => [qw< ^(?:collect|store|render|human_size)$ >] });
