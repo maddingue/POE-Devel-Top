@@ -258,15 +258,15 @@ Version 0.100
 
 =head1 SYNOPSIS
 
-Load the module as any other POE plugin:
-
-    use POE qw< Devel::Top >;
-
-    POE::Devel::Top->spawn;
-
 Load the module from the command line:
 
-    perl -MPOE::Devel::Top ...
+    $ perl -MPOE::Devel::Top program-to-debug ...
+
+Load the module as any other POE plugin:
+
+    use POE::Devel::Top;
+
+    POE::Devel::Top->spawn(...);
 
 
 =head1 DESCRIPTION
@@ -275,7 +275,33 @@ This module displays information about the sessions and events handled
 by the current POE kernel, mimicking the well-known B<top(1)> system
 utility.
 
+The most expected use case is as a temporary debug utility, and as such
+does not need to be added in the target source. The canonical usage is
+to load it from the command line, as shown in the first synopsis:
+
+    $ perl -MPOE::Devel::Top program-to-debug ...
+
+If you load POE::Devel::Top yourself, you need to specify the appropriate
+parameters to C<spawn()>; in particular, to print the information on
+screen, you need to specify the C<render> parameter:
+
+    use POE::Devel::Top;
+
+    POE::Devel::Top->spawn(interval => 2, render => "console");
+
 In this early version, it only prints the information on C<STDOUT>.
+
+However, this may not be appropriate to every needs, because you may
+want to use C<STDOUT> and C<STDERR> for yourself. In that case, you
+can ask the module to dump the information in a file:
+
+    use POE::Devel::Top;
+
+    POE::Devel::Top->spawn(interval => 2, dump_to => "path/to/stats.dmp");
+
+which can then be read by the C<poe-devel-top> utility:
+
+    $ poe-devel-top path/to/stats.dmp
 
 
 =head1 METHODS
